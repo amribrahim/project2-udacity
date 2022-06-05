@@ -1,0 +1,267 @@
+Parameters:
+  AMItoUse:
+    Description: AMI to use for our base image
+    Type: String
+  VPCCIDR:
+    Type: String
+  PrivSubnetCIDR:
+    Type: String
+  PrivSubnetCIDR2:
+    Type: String
+  PubSubnetCIDR:
+    Type: String
+  PubSubnetTwoCIDR:
+    Type: String
+  IstanceType:
+    Type: String
+  LaunchName:
+    Type: String
+  EnvironmentName:
+    Type: String
+  Devicetype:
+    Type: String
+Resources:
+  MainVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref VPCCIDR
+      Tags: 
+        - Key: Name
+          Value: "Main VPC"
+  InternetGW:
+    Type: AWS::EC2::InternetGateway
+  AttachInternetGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MainVPC
+      InternetGatewayId: !Ref InternetGW
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: 'us-east-1a'
+      CidrBlock: !Ref PubSubnetCIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: "Public Subnet AZ1"
+      VpcId: !Ref MainVPC
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: 'us-east-1b'
+      CidrBlock: !Ref PrivSubnetCIDR
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name
+          Value: "Private Subnet AZ1"
+      VpcId: !Ref MainVPC
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: 'us-east-1d'
+      CidrBlock: !Ref PrivSubnetCIDR2
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name
+          Value: "Private Subnet AZ4"
+      VpcId: !Ref MainVPC
+  publicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: 'us-east-1c'
+      CidrBlock: !Ref PubSubnetTwoCIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: "public Subnet AZ3"
+      VpcId: !Ref MainVPC
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+        Tags:
+        - Key: Name
+          Value: "Elastic IP for NGW"
+  NAT:
+    Type: AWS::EC2::NatGateway
+    Properties:
+        AllocationId:
+          Fn::GetAtt:
+          - EIP
+          - AllocationId
+        SubnetId: !Ref PublicSubnet1
+        Tags:
+        - Key: Name
+          Value: "Udacity NAT"
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: "Private Route Table"
+      VpcId: !Ref MainVPC
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: "Public Route Table"
+      VpcId: !Ref MainVPC
+  PublicRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: "Public Route Table2"
+      VpcId: !Ref MainVPC
+  AssociatePUBRT:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+  AssociatePUBRT2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable2
+      SubnetId: !Ref PublicSubnet1
+  AssociatePRIVRT:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+  PublicInternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         Ref: PublicRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         Ref: InternetGW
+  PublicInternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         Ref: PublicRouteTable2
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         Ref: InternetGW
+  PrivateInternetOutboundRoute:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         Ref: PrivateRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       NatGatewayId:
+         Ref: NAT
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      KeyName: test
+      ImageId: !Ref AMItoUse  
+      SecurityGroups: 
+        - !Ref LunchConfigSecurityGroup
+      InstanceType: !Ref IstanceType
+      BlockDeviceMappings:
+        - DeviceName: !Ref Devicetype
+          Ebs: 
+            VolumeSize: '10'
+      UserData: !Base64 |
+        #!/bin/bash -x
+        sudo apt-get update -y
+        sudo apt-get install apache2 -y
+        sudo systemctl start apache2.service
+        cd /var/www/html
+        sudo touch index.html
+        sudo chmod 777 index.html
+        echo "it works! Udagram, Udacity" > index.html
+      LaunchConfigurationName: !Ref LaunchName
+  LunchConfigSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to loadbalancer from autoscaling
+      VpcId: !Ref MainVPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 0.0.0.0/0
+  ELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to our test host
+      VpcId: !Ref MainVPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 0.0.0.0/0
+  myASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref LaunchConfig
+      MaxSize: '4'
+      MinSize: '1'
+      DesiredCapacity: '1'
+      VPCZoneIdentifier: 
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+  ELB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ELBSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref publicSubnet2
+      Tags:
+        - Key: Name
+          Value: udacityELB
+      Type: application
+  
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: TargetGroup
+      LoadBalancerArn:
+        Ref: ELB
+      Port: '80'
+      Protocol: HTTP
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: '80'
+      Protocol: 'HTTP'
+      VpcId: !Ref MainVPC
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+Outputs:
+  UdacityDns:
+    Description: ALB DNS Name 
+    Value:
+      Fn::Join:
+        - ''
+        - - "http://"
+          - Fn::GetAtt: ELB.DNSName
