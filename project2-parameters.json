@@ -1,0 +1,43 @@
+[
+    {
+      "ParameterKey": "AMItoUse",
+      "ParameterValue": "ami-005de95e8ff495156" 
+    },
+    {
+        "ParameterKey": "IstanceType",
+        "ParameterValue": "t3.small"
+      },
+      {
+        "ParameterKey": "LaunchName",
+        "ParameterValue": "udacity-configuration"
+      },
+      { 
+        "ParameterKey": "Devicetype",
+        "ParameterValue": "/dev/sda1"
+
+      },
+    {
+      "ParameterKey": "VPCCIDR",
+      "ParameterValue": "10.0.0.0/16"
+    }, 
+    {
+      "ParameterKey": "PubSubnetCIDR",
+      "ParameterValue": "10.0.1.0/24"
+    },
+    {
+      "ParameterKey": "PubSubnetTwoCIDR",
+      "ParameterValue": "10.0.3.0/24"
+    },
+    {
+        "ParameterKey": "PrivSubnetCIDR2",
+        "ParameterValue": "10.0.4.0/24"
+    },
+    {
+      "ParameterKey": "PrivSubnetCIDR",
+      "ParameterValue": "10.0.2.0/24"
+    },
+    {
+		"ParameterKey": "EnvironmentName",
+		"ParameterValue": "UdacityProject"
+	}
+]
