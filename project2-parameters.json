@@ -37,7 +37,7 @@
       "ParameterValue": "10.0.2.0/24"
     },
     {
-		"ParameterKey": "EnvironmentName",
-		"ParameterValue": "UdacityProject"
-	}
+      "ParameterKey": "EnvironmentName",
+      "ParameterValue": "UdacityProject"
+    }
 ]
